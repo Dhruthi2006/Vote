@@ -323,46 +323,42 @@ app.get("/api/elections/:electionId/results", authenticateToken, async (req, res
       });
     }
 
-    const results = await Vote.aggregate([
-      {
-        $match: {
-          electionId: new mongoose.Types.ObjectId(electionId)
-        }
-      },
-      {
-        $group: {
-          _id: "$candidateId",
-          vote_count: { $sum: 1 }
-        }
-      },
-      {
-        $lookup: {
-          from: "candidates",
-          localField: "_id",
-          foreignField: "_id",
-          as: "candidate"
-        }
-      },
-      {
-        $unwind: "$candidate"
-      }
-    ]);
+    const candidates = await Candidate.aggregate([
+  {
+    $match: {
+      electionId: new mongoose.Types.ObjectId(electionId)
+    }
+  },
+  {
+    $lookup: {
+      from: "votes",
+      localField: "_id",
+      foreignField: "candidateId",
+      as: "votes"
+    }
+  },
+  {
+    $addFields: {
+      vote_count: { $size: "$votes" }
+    }
+  },
+  {
+    $project: {
+      fullName: 1,
+      position: 1,
+      department: 1,
+      vote_count: 1
+    }
+  }
+]);
 
-    const formattedResults = results.map(r => ({
-      fullName: r.candidate.fullName,
-      position: r.candidate.position,
-      department: r.candidate.department,
-      vote_count: r.vote_count
-    }));
+const totalVotes = candidates.reduce((sum, c) => sum + c.vote_count, 0);
 
-    const totalVotes = formattedResults.reduce((sum, r) => sum + r.vote_count, 0);
-
-    res.json({
-      election,
-      results: formattedResults,
-      totalVotes
-    });
-
+res.json({
+  election,
+  results: candidates,
+  totalVotes
+});
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Failed to fetch results" });
