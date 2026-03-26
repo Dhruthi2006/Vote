@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Election Results - Vote Smart</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="header">
+    <div class="container">
+      <div class="header-content">
+        <a href="/" class="logo">
+          <div class="logo-icon">🗳️</div>
+          <span>Vote Smart</span>
+        </a>
+        <nav class="nav">
+          <a href="/" class="nav-link">Home</a>
+          <a href="/vote" class="nav-link">Vote</a>
+          <div id="userSection"></div>
+        </nav>
+      </div>
+    </div>
+  </header>
+
+  <main class="container py-8">
+    <div class="card-header text-center mb-4">
+      <h1 class="card-title" style="font-size: 2rem;">Election Results</h1>
+      <p class="card-description">Live results and vote counts</p>
+    </div>
+
+    <div id="loadingContainer" class="loading">
+      <div class="spinner"></div>
+    </div>
+
+    <div id="contentContainer" class="hidden">
+      <div class="card mb-4">
+        <h2 class="card-title" id="electionTitle"></h2>
+        <p class="card-description" id="electionDescription"></p>
+        
+        <div class="stats-grid" style="margin-top: 1.5rem;">
+          <div class="stat-card">
+            <div class="stat-label">Total Votes Cast</div>
+            <div class="stat-value" id="totalVotes">0</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Election Status</div>
+            <div class="stat-value" id="electionStatus" style="font-size: 1.25rem; text-transform: capitalize;"></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="alertContainer"></div>
+
+      <div id="resultsContainer">
+      </div>
+
+      <div id="noResultsSection" class="hidden">
+        <div class="card text-center">
+          <div style="font-size: 4rem; margin-bottom: 1rem;">📊</div>
+          <h2 style="font-size: 1.875rem; margin-bottom: 1rem;">Results Not Available</h2>
+          <p style="color: var(--text-secondary); font-size: 1.125rem;">Results will be available after the election period ends.</p>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="auth.js"></script>
+  <script>
+    const token = localStorage.getItem('token');
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+
+    // Update user section
+    const userSection = document.getElementById('userSection');
+    if (token) {
+      userSection.innerHTML = `
+        <div class="user-info">
+          <span>${user.fullName || user.fullName || ''}</span>
+          <button class="btn btn-secondary" style="padding: 0.5rem 1rem;" onclick="logout()">Logout</button>
+        </div>
+      `;
+    }
+
+    async function loadResults() {
+      try {
+        // Get active election first
+        const electionsResponse = await fetch('/api/elections', {
+          headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+        });
+
+        if (!electionsResponse.ok) {
+          throw new Error('No elections available');
+        }
+
+        const elections = await electionsResponse.json();
+        const activeElection = elections.find(e => e.status === 'active' || e.status === 'completed');
+
+        if (!activeElection) {
+          document.getElementById('loadingContainer').classList.add('hidden');
+          document.getElementById('contentContainer').classList.remove('hidden');
+          document.getElementById('noResultsSection').classList.remove('hidden');
+          return;
+        }
+
+        // Try to get results
+        const resultsResponse = await fetch(`/api/elections/${activeElection._id}/results`, {
+          headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+        });
+
+        if (!resultsResponse.ok) {
+          if (resultsResponse.status === 403) {
+            document.getElementById('loadingContainer').classList.add('hidden');
+            document.getElementById('contentContainer').classList.remove('hidden');
+            document.getElementById('noResultsSection').classList.remove('hidden');
+            return;
+          }
+          throw new Error('Failed to load results');
+        }
+
+        const data = await resultsResponse.json();
+        
+        document.getElementById('electionTitle').textContent = data.election.title;
+        document.getElementById('electionDescription').textContent = data.election.description;
+        document.getElementById('totalVotes').textContent = data.totalVotes;
+        document.getElementById('electionStatus').textContent = data.election.status;
+
+        displayResults(data.results, data.totalVotes);
+
+        document.getElementById('loadingContainer').classList.add('hidden');
+        document.getElementById('contentContainer').classList.remove('hidden');
+      } catch (error) {
+        console.error('Error loading results:', error);
+        document.getElementById('loadingContainer').classList.add('hidden');
+        document.getElementById('contentContainer').classList.remove('hidden');
+        document.getElementById('noResultsSection').classList.remove('hidden');
+      }
+    }
+
+    function displayResults(results, totalVotes) {
+      const container = document.getElementById('resultsContainer');
+      container.innerHTML = '';
+
+      // Group by position
+      const groupedResults = {};
+      results.forEach(result => {
+        if (!groupedResults[result.position]) {
+          groupedResults[result.position] = [];
+        }
+        groupedResults[result.position].push(result);
+      });
+
+      // Display each position group
+      Object.keys(groupedResults).forEach(position => {
+        const positionCard = document.createElement('div');
+        positionCard.className = 'card mb-4';
+        
+        let positionHTML = `
+          <h3 style="font-size: 1.5rem; font-weight: 700; margin-bottom: 1.5rem; color: var(--accent-primary);">
+            ${position}
+          </h3>
+        `;
+
+        groupedResults[position].forEach(result => {
+          const percentage = totalVotes > 0 ? ((result.vote_count / totalVotes) * 100).toFixed(1) : 0;
+          const initials = result.fullName.split(' ').map(n => n[0]).join('');
+          
+          positionHTML += `
+            <div class="result-item">
+              <div class="result-header">
+                <div class="result-candidate">
+                  <div class="result-avatar">${initials}</div>
+                  <div>
+                    <div class="result-name">${result.fullName}</div>
+                    <div style="color: var(--text-secondary); font-size: 0.875rem;">${result.department}</div>
+                  </div>
+                </div>
+                <div class="result-votes">${result.vote_count} votes</div>
+              </div>
+              <div class="result-bar">
+                <div class="result-bar-fill" style="width: ${percentage}%"></div>
+              </div>
+              <div style="text-align: right; color: var(--text-secondary); font-size: 0.875rem; margin-top: 0.5rem;">
+                ${percentage}% of total votes
+              </div>
+            </div>
+          `;
+        });
+
+        positionCard.innerHTML = positionHTML;
+        container.appendChild(positionCard);
+      });
+    }
+
+    loadResults();
+  </script>
+</body>
+</html>

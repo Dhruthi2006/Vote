@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard - Vote Smart</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="header">
+    <div class="container">
+      <div class="header-content">
+        <a href="/" class="logo">
+          <div class="logo-icon">🗳️</div>
+          <span>Vote Smart Admin</span>
+        </a>
+        <nav class="nav">
+          <a href="/results" class="nav-link">Results</a>
+          <div class="user-info">
+            <span class="user-badge">Admin</span>
+            <span id="adminName"></span>
+            <button class="btn btn-secondary" style="padding: 0.5rem 1rem;" onclick="logout()">Logout</button>
+          </div>
+        </nav>
+      </div>
+    </div>
+  </header>
+
+  <main class="container py-8">
+    <h1 style="font-size: 2rem; font-weight: 700; margin-bottom: 2rem;">Admin Dashboard</h1>
+
+    <div id="statsContainer" class="stats-grid mb-4">
+      <div class="stat-card">
+        <div class="stat-icon" style="background-color: var(--accent-light); color: var(--accent-primary);">
+          👥
+        </div>
+        <div class="stat-label">Total Students</div>
+        <div class="stat-value" id="totalStudents">0</div>
+      </div>
+      
+      <div class="stat-card">
+        <div class="stat-icon" style="background-color: var(--success-light); color: var(--success);">
+          🗳️
+        </div>
+        <div class="stat-label">Total Votes</div>
+        <div class="stat-value" id="totalVotesCount">0</div>
+      </div>
+      
+      <div class="stat-card">
+        <div class="stat-icon" style="background-color: rgba(234, 179, 8, 0.1); color: #eab308;">
+          📊
+        </div>
+        <div class="stat-label">Active Elections</div>
+        <div class="stat-value" id="activeElections">0</div>
+      </div>
+      
+      <div class="stat-card">
+        <div class="stat-icon" style="background-color: rgba(168, 85, 247, 0.1); color: #a855f7;">
+          ✓
+        </div>
+        <div class="stat-label">Completed Elections</div>
+        <div class="stat-value" id="completedElections">0</div>
+      </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-bottom: 2rem;">
+      <div class="card">
+        <h2 class="card-title">Create New Election</h2>
+        <form id="createElectionForm">
+          <div class="form-group">
+            <label class="form-label" for="title">Election Title</label>
+            <input type="text" id="title" class="form-input" required>
+          </div>
+          
+          <div class="form-group">
+            <label class="form-label" for="description">Description</label>
+            <textarea id="description" class="form-textarea" required></textarea>
+          </div>
+          
+          <div class="form-group">
+            <label class="form-label" for="startDate">Start Date & Time</label>
+            <input type="datetime-local" id="startDate" class="form-input" required>
+          </div>
+          
+          <div class="form-group">
+            <label class="form-label" for="endDate">End Date & Time</label>
+            <input type="datetime-local" id="endDate" class="form-input" required>
+          </div>
+          
+          <button type="submit" class="btn btn-primary" style="width: 100%;">Create Election</button>
+        </form>
+      </div>
+
+      <div class="card">
+        <h2 class="card-title">Add Candidate</h2>
+        <form id="addCandidateForm">
+          <div class="form-group">
+            <label class="form-label" for="candidateElection">Election</label>
+            <select id="candidateElection" class="form-select" required>
+              <option value="">Select election...</option>
+            </select>
+          </div>
+          
+          <div class="form-group">
+            <label class="form-label" for="candidateName">Full Name</label>
+            <input type="text" id="candidateName" class="form-input" required>
+          </div>
+          
+          <div class="form-group">
+            <label class="form-label" for="position">Position</label>
+            <input type="text" id="position" class="form-input" placeholder="e.g., President" required>
+          </div>
+          
+          <div class="form-group">
+            <label class="form-label" for="department">Department</label>
+            <input type="text" id="department" class="form-input" required>
+          </div>
+          
+          <div class="form-group">
+            <label class="form-label" for="manifesto">Manifesto</label>
+            <textarea id="manifesto" class="form-textarea" required></textarea>
+          </div>
+          
+          <div class="form-group">
+            <label class="form-label" for="photoUrl">Photo URL (Optional)</label>
+            <input type="text" id="photoUrl" class="form-input">
+          </div>
+          
+          <button type="submit" class="btn btn-success" style="width: 100%;">Add Candidate</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2 class="card-title">Manage Elections</h2>
+      <div id="electionsTable">
+        <div class="loading">
+          <div class="spinner"></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="auth.js"></script>
+  <script>
+    requireAuth('admin');
+    
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    document.getElementById('adminName').textContent = user.fullName || user.full_name || '';
+
+    async function loadStats() {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch('/api/admin/stats', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        const stats = await response.json();
+        
+        document.getElementById('totalStudents').textContent = stats.totalStudents;
+        document.getElementById('totalVotesCount').textContent = stats.totalVotes;
+        document.getElementById('activeElections').textContent = stats.activeElections;
+        document.getElementById('completedElections').textContent = stats.completedElections;
+      } catch (error) {
+        console.error('Error loading stats:', error);
+      }
+    }
+
+    async function loadElections() {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch('/api/elections', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        const elections = await response.json();
+        
+        // Populate election select
+        const select = document.getElementById('candidateElection');
+        select.innerHTML = '<option value="">Select election...</option>';
+        elections.forEach(election => {
+          const option = document.createElement('option');
+          option.value = election._id;
+          option.textContent = election.title;
+          select.appendChild(option);
+        });
+
+        // Display elections table
+        const tableContainer = document.getElementById('electionsTable');
+        
+        if (elections.length === 0) {
+          tableContainer.innerHTML = '<p style="color: var(--text-secondary); text-align: center;">No elections created yet.</p>';
+          return;
+        }
+
+        let tableHTML = `
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Title</th>
+                <th>Start Date</th>
+                <th>End Date</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+        `;
+
+        elections.forEach(election => {
+          const startDate = new Date(election.startDate).toLocaleString();
+const endDate = new Date(election.endDate).toLocaleString();
+          
+          tableHTML += `
+            <tr>
+              <td><strong>${election.title}</strong></td>
+              <td>${startDate}</td>
+              <td>${endDate}</td>
+              <td>
+                <span class="user-badge" style="background-color: ${getStatusColor(election.status)};">
+                  ${election.status}
+                </span>
+              </td>
+              <td>
+                <select class="form-select" style="width: auto; padding: 0.5rem;" onchange="updateElectionStatus('${election._id}', this.value)">
+                  <option value="">Change status...</option>
+                  <option value="upcoming">Upcoming</option>
+                  <option value="active">Active</option>
+                  <option value="completed">Completed</option>
+                </select>
+              </td>
+            </tr>
+          `;
+        });
+
+        tableHTML += '</tbody></table>';
+        tableContainer.innerHTML = tableHTML;
+      } catch (error) {
+        console.error('Error loading elections:', error);
+      }
+    }
+
+    function getStatusColor(status) {
+      switch(status) {
+        case 'active': return 'var(--success-light)';
+        case 'completed': return 'rgba(168, 85, 247, 0.1)';
+        default: return 'var(--accent-light)';
+      }
+    }
+
+    async function updateElectionStatus(electionId, status) {
+      if (!status) return;
+
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`/api/elections/${electionId}/status`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ status })
+        });
+
+        if (response.ok) {
+          alert('Election status updated successfully');
+          loadElections();
+          loadStats();
+        } else {
+          alert('Failed to update election status');
+        }
+      } catch (error) {
+        console.error('Error updating status:', error);
+        alert('Network error');
+      }
+    }
+
+    document.getElementById('createElectionForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const title = document.getElementById('title').value;
+      const description = document.getElementById('description').value;
+      const startDate = document.getElementById('startDate').value;
+      const endDate = document.getElementById('endDate').value;
+
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch('/api/elections', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ title, description, startDate, endDate })
+        });
+
+        if (response.ok) {
+          alert('Election created successfully');
+          e.target.reset();
+          loadElections();
+          loadStats();
+        } else {
+          alert('Failed to create election');
+        }
+      } catch (error) {
+        console.error('Error creating election:', error);
+        alert('Network error');
+      }
+    });
+
+    document.getElementById('addCandidateForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const electionId = document.getElementById('candidateElection').value;
+      const fullName = document.getElementById('candidateName').value;
+      const position = document.getElementById('position').value;
+      const department = document.getElementById('department').value;
+      const manifesto = document.getElementById('manifesto').value;
+      const photoUrl = document.getElementById('photoUrl').value || ''; // Optional field
+
+      console.log('[v0] Sending candidate data:', { electionId, fullName, position, department, manifesto, photoUrl });
+
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch('/api/candidates', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ electionId, fullName, position, department, manifesto, photoUrl })
+        });
+
+        const data = await response.json();
+        console.log('[v0] Server response:', data);
+
+        if (response.ok) {
+          alert('Candidate added successfully');
+          e.target.reset();
+        } else {
+          alert('Failed to add candidate: ' + (data.error || 'Unknown error'));
+        }
+      } catch (error) {
+        console.error('Error adding candidate:', error);
+        alert('Network error: ' + error.message);
+      }
+    });
+
+    loadStats();
+    loadElections();
+  </script>
+</body>
+</html>

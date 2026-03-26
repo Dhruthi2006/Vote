@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cast Your Vote - Vote Smart</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="header">
+    <div class="container">
+      <div class="header-content">
+        <a href="/" class="logo">
+          <div class="logo-icon">🗳️</div>
+          <span>Vote Smart</span>
+        </a>
+        <nav class="nav">
+          <a href="/results" class="nav-link">Results</a>
+          <div class="user-info" id="userInfo">
+            <span id="userName"></span>
+            <button class="btn btn-secondary" style="padding: 0.5rem 1rem;" onclick="logout()">Logout</button>
+          </div>
+        </nav>
+      </div>
+    </div>
+  </header>
+
+  <main class="container py-8">
+    <div id="loadingContainer" class="loading">
+      <div class="spinner"></div>
+    </div>
+
+    <div id="contentContainer" class="hidden">
+      <div class="card-header text-center mb-4">
+        <h1 class="card-title" style="font-size: 2rem;" id="electionTitle"></h1>
+        <p class="card-description" id="electionDescription"></p>
+      </div>
+
+      <div id="alertContainer"></div>
+
+      <div id="votingSection">
+        <div style="margin-bottom: 2rem;">
+          <h2 style="font-size: 1.5rem; margin-bottom: 1rem;">Select Your Candidates</h2>
+        </div>
+
+        <div id="candidatesContainer" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1.5rem;">
+        </div>
+
+        <div style="margin-top: 2rem; text-align: center;">
+          <button id="submitVoteBtn" class="btn btn-success" style="padding: 1rem 3rem; font-size: 1.125rem;" onclick="submitVote()">
+            Submit Vote
+          </button>
+        </div>
+      </div>
+
+      <div id="alreadyVotedSection" class="hidden">
+        <div class="card text-center">
+          <div style="font-size: 4rem; margin-bottom: 1rem;">✓</div>
+          <h2 style="font-size: 1.875rem; margin-bottom: 1rem;">Vote Recorded Successfully</h2>
+          <p style="color: var(--text-secondary); font-size: 1.125rem; margin-bottom: 2rem;">Thank you for participating in this election. Your vote has been securely recorded.</p>
+          <a href="/results" class="btn btn-primary">View Results</a>
+        </div>
+      </div>
+
+      <div id="noElectionSection" class="hidden">
+        <div class="card text-center">
+          <div style="font-size: 4rem; margin-bottom: 1rem;">📅</div>
+          <h2 style="font-size: 1.875rem; margin-bottom: 1rem;">No Active Election</h2>
+          <p style="color: var(--text-secondary); font-size: 1.125rem; margin-bottom: 2rem;">There are no active elections at the moment. Please check back later.</p>
+          <a href="/" class="btn btn-primary">Go Home</a>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="auth.js"></script>
+  <script>
+    requireAuth();
+    
+    let selectedCandidate = null;
+    let currentElection = null;
+
+    async function loadElection() {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch('/api/elections/active', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (!response.ok) {
+          document.getElementById('loadingContainer').classList.add('hidden');
+          document.getElementById('contentContainer').classList.remove('hidden');
+          document.getElementById('noElectionSection').classList.remove('hidden');
+          return;
+        }
+
+        currentElection = await response.json();
+        
+        document.getElementById('electionTitle').textContent = currentElection.title;
+        document.getElementById('electionDescription').textContent = currentElection.description;
+
+        await checkVotingStatus();
+        await loadCandidates();
+
+        document.getElementById('loadingContainer').classList.add('hidden');
+        document.getElementById('contentContainer').classList.remove('hidden');
+      } catch (error) {
+        console.error('Error loading election:', error);
+        showAlert('Failed to load election data', 'error');
+      }
+    }
+
+    async function checkVotingStatus() {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`/api/elections/${currentElection._id}/voted`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        const data = await response.json();
+        
+        if (data.hasVoted) {
+          document.getElementById('votingSection').classList.add('hidden');
+          document.getElementById('alreadyVotedSection').classList.remove('hidden');
+        }
+      } catch (error) {
+        console.error('Error checking voting status:', error);
+      }
+    }
+
+    async function loadCandidates() {
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch(`/api/elections/${currentElection._id}/candidates`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        const candidates = await response.json();
+        
+        const container = document.getElementById('candidatesContainer');
+        container.innerHTML = '';
+
+        candidates.forEach(candidate => {
+          const card = document.createElement('div');
+          card.className = 'candidate-card';
+          card.onclick = () => selectCandidate(candidate._id, card);
+          
+          const initials = candidate.fullName.split(' ').map(n => n[0]).join('');
+          
+          card.innerHTML = `
+            <div class="candidate-header">
+              <div class="candidate-avatar">${initials}</div>
+              <div class="candidate-info">
+                <h3>${candidate.fullName}</h3>
+                <div class="candidate-position">${candidate.position}</div>
+                <div class="candidate-department">${candidate.department}</div>
+              </div>
+            </div>
+            <div class="candidate-manifesto">${candidate.manifesto || 'No manifesto provided'}</div>
+          `;
+          
+          container.appendChild(card);
+        });
+      } catch (error) {
+        console.error('Error loading candidates:', error);
+        showAlert('Failed to load candidates', 'error');
+      }
+    }
+
+    function selectCandidate(candidateId, cardElement) {
+      // Remove previous selection
+      document.querySelectorAll('.candidate-card').forEach(card => {
+        card.classList.remove('selected');
+      });
+      
+      // Add new selection
+      cardElement.classList.add('selected');
+      selectedCandidate = candidateId;
+    }
+
+    async function submitVote() {
+      if (!selectedCandidate) {
+        showAlert('Please select a candidate before submitting', 'error');
+        return;
+      }
+
+      const submitBtn = document.getElementById('submitVoteBtn');
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Submitting...';
+
+      try {
+        const token = localStorage.getItem('token');
+        const response = await fetch('/api/vote', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            electionId: currentElection._id,
+            candidateId: selectedCandidate
+          })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          showAlert('Vote submitted successfully!', 'success');
+          setTimeout(() => {
+            document.getElementById('votingSection').classList.add('hidden');
+            document.getElementById('alreadyVotedSection').classList.remove('hidden');
+          }, 1500);
+        } else {
+          showAlert(data.error || 'Failed to submit vote', 'error');
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Submit Vote';
+        }
+      } catch (error) {
+        console.error('Error submitting vote:', error);
+        showAlert('Network error. Please try again.', 'error');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Submit Vote';
+      }
+    }
+
+    function showAlert(message, type) {
+      const alertContainer = document.getElementById('alertContainer');
+      alertContainer.innerHTML = `
+        <div class="alert alert-${type}">
+          ${type === 'success' ? '✓' : '✕'} ${message}
+        </div>
+      `;
+      
+      setTimeout(() => {
+        alertContainer.innerHTML = '';
+      }, 5000);
+    }
+
+    // Load user info
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    document.getElementById('userName').textContent = user.fullName || user.full_name || '';
+
+    // Load election data
+    loadElection();
+  </script>
+</body>
+</html>

@@ -1,0 +1,37 @@
+{
+  "name": "vote-smart-voting-system",
+  "version": "1.0.0",
+  "description": "Secure Online Election Voting System",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "fix-passwords": "node scripts/fix-passwords.js",
+    "generate-passwords": "node scripts/generate-passwords.js"
+  },
+  "keywords": [
+    "voting",
+    "election",
+    "online-voting",
+    "college"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+  "bcryptjs": "^3.0.3",
+  "cors": "^2.8.6",
+  "dotenv": "^16.6.1",
+  "express": "^4.22.1",
+  "jsonwebtoken": "^9.0.3",
+  "mongoose": "^9.3.0"
+},
+  "devDependencies": {
+    "@types/node": "25.0.3",
+    "@types/react": "19.2.7",
+    "@types/react-dom": "19.2.3",
+    "nodemon": "^3.0.2",
+    "postcss": "8.5.6",
+    "tailwindcss": "^4.1.9",
+    "typescript": "5.9.3"
+  }
+}
