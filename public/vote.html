@@ -80,35 +80,55 @@
     let selectedCandidate = null;
     let currentElection = null;
 
-    async function loadElection() {
-      try {
-        const token = localStorage.getItem('token');
-        const response = await fetch('/api/elections/active', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
+ async function loadElection() {
+  try {
+    const token = localStorage.getItem('token');
 
-        if (!response.ok) {
-          document.getElementById('loadingContainer').classList.add('hidden');
-          document.getElementById('contentContainer').classList.remove('hidden');
-          document.getElementById('noElectionSection').classList.remove('hidden');
-          return;
-        }
+    const response = await fetch('/api/elections/active', {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
 
-        currentElection = await response.json();
-        
-        document.getElementById('electionTitle').textContent = currentElection.title;
-        document.getElementById('electionDescription').textContent = currentElection.description;
-
-        await checkVotingStatus();
-        await loadCandidates();
-
-        document.getElementById('loadingContainer').classList.add('hidden');
-        document.getElementById('contentContainer').classList.remove('hidden');
-      } catch (error) {
-        console.error('Error loading election:', error);
-        showAlert('Failed to load election data', 'error');
-      }
+    if (!response.ok) {
+      document.getElementById('loadingContainer').classList.add('hidden');
+      document.getElementById('contentContainer').classList.remove('hidden');
+      document.getElementById('noElectionSection').classList.remove('hidden');
+      return;
     }
+
+    currentElection = await response.json();
+
+    // ✅ CHECK ELIGIBILITY
+    const eligibleResponse = await fetch(`/api/elections/${currentElection._id}/eligible`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+
+    const eligibleData = await eligibleResponse.json();
+
+    if (!eligibleData.eligible) {
+      document.getElementById('loadingContainer').classList.add('hidden');
+      document.getElementById('contentContainer').classList.remove('hidden');
+
+      showAlert("You are not allowed to vote in this election", "error");
+
+      document.getElementById('votingSection').classList.add('hidden');
+      return;
+    }
+
+    // ✅ NORMAL FLOW
+    document.getElementById('electionTitle').textContent = currentElection.title;
+    document.getElementById('electionDescription').textContent = currentElection.description;
+
+    await checkVotingStatus();
+    await loadCandidates();
+
+    document.getElementById('loadingContainer').classList.add('hidden');
+    document.getElementById('contentContainer').classList.remove('hidden');
+
+  } catch (error) {
+    console.error('Error loading election:', error);
+    showAlert('Failed to load election data', 'error');
+  }
+}
 
     async function checkVotingStatus() {
       try {

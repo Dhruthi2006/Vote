@@ -26,7 +26,15 @@ const electionSchema = new mongoose.Schema(
     type: String,
     enum: ["upcoming", "active", "completed"],
     default: "upcoming"
-  }
+  },
+
+  // ✅ ADD THIS
+  assignedStudents: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Student"
+    }
+  ]
 
 },
 { timestamps: true }
